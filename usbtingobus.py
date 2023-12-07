@@ -99,7 +99,7 @@ class USBtingoBus(BusABC):
         self.data_bitrate = kwargs.get("data_bitrate", self.bitrate)
         self.is_fd = kwargs.get("fd", False)
         self.serialnumber = kwargs.get("serial", channel)
-        self.protocol = kwargs.get("protocol", self.PROTOCOL_CAN_FD if self.is_fd else self.PROTOCOL_CAN_20)
+        self.cprotocol = kwargs.get("protocol", self.PROTOCOL_CAN_FD if self.is_fd else self.PROTOCOL_CAN_20)
         self.receive_own_messages = kwargs.get("receive_own_messages", False)
         state = kwargs.get("state", BusState.ACTIVE)
 
@@ -124,12 +124,12 @@ class USBtingoBus(BusABC):
         self.rx_queue = queue.Queue()
 
         flags = 0
-        if self.protocol > 0:
+        if self.cprotocol > 0:
             flags = flags | (1 << 0) #brse
 
         self.deviceinfo_read()
         self.command_write(self.CMD_SET_MODE, 0)
-        self.command_write(self.CMD_SET_PROTOCOL, self.protocol | (flags << 8))
+        self.command_write(self.CMD_SET_PROTOCOL, self.cprotocol | (flags << 8))
         self.command_write(self.CMD_SET_BAUDRATE, 0, 0, struct.pack("<I", self.bitrate))
         self.command_write(self.CMD_SET_BAUDRATE, 1, 0, struct.pack("<I", self.data_bitrate))
         self.command_write(self.CMD_SET_MODE, mode)
@@ -463,7 +463,7 @@ class USBtingoBus(BusABC):
 
         # if no samplingrate given, determine one depending bitrate
         if samplingrate is None:
-            if self.protocol == self.PROTOCOL_CAN_20:
+            if self.cprotocol == self.PROTOCOL_CAN_20:
                 samplingrate = self.bitrate * 10
             else:
                 samplingrate = self.data_bitrate * 10
