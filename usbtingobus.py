@@ -19,6 +19,7 @@
 from typing import Any, Optional, Tuple
 from can import BusABC, Message, typechecking, CanTimeoutError, CanOperationError, CanInitializationError, BusState
 from can.util import len2dlc, dlc2len
+import platform
 import usb1
 import struct
 import threading
@@ -147,12 +148,18 @@ class USBtingoBus(BusABC):
             t.setBulk(0x82, 1400 * 512, th2in)
             self.ep2in_transfer.append(t)
 
+        ep3in_nrofpackets = 256
+        if platform.machine().startswith('arm'):
+            # On most ARM systems URB max length is 16kB, use it as transfer length limit to prevent
+            # unnecessary kernel activity, especially with short transfers.
+            ep3in_nrofpackets = 32
+
         th3in = usb1.USBTransferHelper()
         th3in.setEventCallback(usb1.TRANSFER_COMPLETED, self.usbtransfer_ep3in_callback)
         self.ep3in_transfer = []
-        for _ in range(32):
+        for _ in range(8192 // ep3in_nrofpackets):
             t = self.usbhandle.getTransfer()
-            t.setBulk(0x83, 256 * 512, th3in)
+            t.setBulk(0x83, ep3in_nrofpackets * 512, th3in)
             t.submit()        
             self.ep3in_transfer.append(t)
 
