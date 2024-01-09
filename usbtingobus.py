@@ -1,7 +1,7 @@
 # This file is part of the python-can-usbtingo project, a plugin for
 # python-can to support the USBtingo USB to CAN-FD interface.
 #
-# Copyright(c) 2023 Thomas Fischl (https://www.fischl.de)
+# Copyright(c) 2023-2024 Thomas Fischl (https://www.fischl.de)
 # 
 # python-can-usbtingo is free software: you can redistribute it and/or modify
 # it under the terms of the GNU LESSER GENERAL PUBLIC LICENSE as published by
@@ -381,13 +381,12 @@ class USBtingoBus(BusABC):
                     get_tx_confirmation = False
 
                 # add padding bytes if needed to get 32bit aligned
-                data = msg.data
-                while len(data) % 4 != 0:
-                    data.append(0x00)
-
+                padlength = (4 - (len(msg.data) % 4)) % 4
+                datalength = len(msg.data) + padlength
+                    
                 # prepare header
                 messagetype = 0x01
-                messagesize = int(2 + len(data) / 4)
+                messagesize = int(2 + datalength / 4)
                 mid = msg.arbitration_id
                 if not msg.is_extended_id:
                     mid = mid << 18
@@ -404,7 +403,7 @@ class USBtingoBus(BusABC):
                 header = struct.pack("<BBxxIxxBB", messagetype, messagesize, mid, mdlc, self.txmm)
 
                 # check if this message fits completely into this usb packet, if not add padding bytes to start new usb packet
-                size = len(header) + len(data)
+                size = len(header) + datalength
                 if (size > current_usbpacketremaining):
                     while current_usbpacketremaining > 0:
                         packet.append(0x00)
@@ -413,7 +412,8 @@ class USBtingoBus(BusABC):
 
                 # add header and data to packet
                 packet.extend(header)
-                packet.extend(bytes(data))
+                packet.extend(bytes(msg.data))
+                packet.extend(bytes([0x00] * padlength))
                 current_usbpacketremaining = current_usbpacketremaining - size
 
                 # if we have requested tx event, add it to fifo
