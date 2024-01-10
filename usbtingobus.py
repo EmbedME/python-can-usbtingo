@@ -170,7 +170,17 @@ class USBtingoBus(BusABC):
             t = self.usbhandle.getTransfer()
             t.setBulk(0x3, 128 * 512, th3out)
             t.inuse = False
-            self.ep3out_transfer.append(t)            
+            self.ep3out_transfer.append(t)
+
+        self.statusreport_listeners = []
+        th1in = usb1.USBTransferHelper()
+        th1in.setEventCallback(usb1.TRANSFER_COMPLETED, self.usbtransfer_ep1in_callback)
+        self.ep1in_transfer = []
+        for _ in range(2):
+            t = self.usbhandle.getTransfer()
+            t.setInterrupt(0x81, 64, th1in)
+            t.submit()
+            self.ep1in_transfer.append(t)        
 
         self._is_filtered = False
         super().__init__(
@@ -548,6 +558,40 @@ class USBtingoBus(BusABC):
                 
         return True
 
+    def usbtransfer_ep1in_callback(self, t):
+        """
+        Complete callback for EP1IN USB transfers. This is the statusreport pipe.
+        :param t: USB transfer object
+        """
+        data = t.getBuffer()
+        if data[0] != 0x80:
+            return True
+
+        report = USBtingoStatusreport(data[:32])
+        for listener in self.statusreport_listeners:
+            listener(report)
+                
+        return True
+
+    def statusreport_listener_add(self, func):
+        """
+        Add a statusreport listener (callback)
+        :param func: Function to add to listener list
+        :type func: function
+        """
+        self.statusreport_listeners.append(func)
+
+    def statusreport_listener_remove(self, func):
+        """
+        Remove given function from listeners list
+        :param func: Function to remove from listener list
+        :type func: function
+        """
+        if func in self.statusreport_listeners:
+            self.statusreport_listeners.remove(func)
+        else:
+            raise CanOperationError("Failed to remove status report listener")
+
     def _apply_filters(self, filters):
         """
         Apply given filters. Try to set hardware filter (there are 32 each for standard and extended frames)
@@ -616,6 +660,29 @@ class USBtingoBus(BusABC):
             {"interface": "usbtingo", "channel": channel}
             for channel in channels
         ]
+
+class USBtingoStatusreport(object):
+
+    def __init__(self, rawdata):
+        self.cmd, self.mode, self.overflow, self.procts, self.errorcount, self.protocolstatus, self.stats_std, self.stats_ext, self.stats_data, self.stats_dataBRS  = struct.unpack("<BBBxIIIIIII", rawdata)        
+
+    def getTEC(self):
+        return self.errorcount & 0xff
+
+    def getREC(self):
+        return (self.errorcount >> 8) & 0x7f
+
+    def isReceiveErrorPassive(self):
+        return (self.errorcount >> 15 & 0x1) == 1
+
+    def isErrorPassive(self):
+        return (self.protocolstatus >> 5 & 0x1) == 1
+
+    def isBusOff(self):
+        return (self.protocolstatus >> 7 & 0x1) == 1
+
+    def isWarningStatus(self):
+        return (self.protocolstatus >> 6 & 0x1) == 1
 
 class TXConfirmation(object):
     
