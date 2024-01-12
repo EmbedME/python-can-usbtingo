@@ -6,7 +6,7 @@ This module is a plugin for python-can. It adds support for the [USBtingo USB to
 
 Install using pip:
 
-    $ pip install git+https://github.com/EmbedME/python-can-usbtingo
+    $ pip install python-can-usbtingo
 
 ## Usage
 
