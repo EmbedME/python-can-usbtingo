@@ -1,6 +1,6 @@
 # This file is part of the python-can-usbtingo project.
 #
-# Copyright(c) 2023 Thomas Fischl (https://www.fischl.de)
+# Copyright(c) 2023-2024 Thomas Fischl (https://www.fischl.de)
 # 
 # python-can-usbtingo is free software: you can redistribute it and/or modify
 # it under the terms of the GNU LESSER GENERAL PUBLIC LICENSE as published by
@@ -26,7 +26,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name="python-can-usbtingo",
-    version="1.0.0",
+    version="1.0.1",
     author="Thomas Fischl",
     author_email="tfischl@gmx.de",
     description="Python-can USBtingo",
@@ -43,5 +43,10 @@ setup(
         'can.interface': [
             'usbtingo = usbtingobus:USBtingoBus'
         ]
-    }
+    },
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+        "Operating System :: OS Independent",
+    ]
 )
