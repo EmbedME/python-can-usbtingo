@@ -26,7 +26,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name="python-can-usbtingo",
-    version="1.0.1",
+    version="1.0.2",
     author="Thomas Fischl",
     author_email="tfischl@gmx.de",
     description="Python-can USBtingo",
