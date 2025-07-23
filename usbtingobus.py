@@ -476,7 +476,7 @@ class USBtingoBus(BusABC):
         """
 
         if self.recordingActive:
-        	raise CanOperationError("Logic recording is already running. It cannot be started more than once.")
+            raise CanOperationError("Logic recording is already running. It cannot be started more than once.")
 
         # if no samplingrate given, determine one depending bitrate
         if samplingrate is None:
