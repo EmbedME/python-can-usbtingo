@@ -65,6 +65,8 @@ class USBtingoBus(BusABC):
     MODE_ACTIVE = 1
     MODE_LISTENONLY = 2
 
+    MCAN_CLOCK_HZ = 120_000_000
+
     def __init__(self, channel=None, can_filters=None, **kwargs):
 
         """
@@ -104,6 +106,8 @@ class USBtingoBus(BusABC):
         self.is_fd = kwargs.get("fd", False)
         timing = kwargs.get("timing")
         if self.is_fd and isinstance(timing, BitTimingFd):
+            if timing.f_clock != self.MCAN_CLOCK_HZ:
+                timing = timing.recreate_with_f_clock(self.MCAN_CLOCK_HZ)
             self.bitrate = timing.nom_bitrate
             self.data_bitrate = timing.data_bitrate
         else:
