@@ -17,7 +17,7 @@
 # along with python-can-usbtingo.  If not, see <http://www.gnu.org/licenses/>
 
 from typing import Any, Optional, Tuple
-from can import BusABC, Message, typechecking, CanTimeoutError, CanOperationError, CanInitializationError, BusState
+from can import BitTimingFd, BusABC, Message, CanTimeoutError, CanOperationError, CanInitializationError, BusState
 from can.util import len2dlc, dlc2len
 import platform
 import usb1
@@ -83,7 +83,12 @@ class USBtingoBus(BusABC):
             
         :param bool fd:
             If CAN-FD should be enabled.
-            
+
+        :param can.BitTimingFd timing:
+            An instance of can.BitTimingFd to manually specify bit timing parameters.
+            If this parameter is provided, the bitrate and data_bitrate parameters are ignored.
+            This parameter is only relevant for CAN FD, it is ignored when using CAN 2.0.
+
         :param bool receive_own_messages:
             If messages transmitted should also be received back.
 
@@ -95,10 +100,16 @@ class USBtingoBus(BusABC):
             BusState of the channel.
             Default is ACTIVE.            
         """
-        
-        self.bitrate = kwargs.get("bitrate", 500000)
-        self.data_bitrate = kwargs.get("data_bitrate", self.bitrate)
+
         self.is_fd = kwargs.get("fd", False)
+        timing = kwargs.get("timing")
+        if self.is_fd and isinstance(timing, BitTimingFd):
+            self.bitrate = timing.nom_bitrate
+            self.data_bitrate = timing.data_bitrate
+        else:
+            self.bitrate = kwargs.get("bitrate", 500000)
+            self.data_bitrate = kwargs.get("data_bitrate", self.bitrate)
+
         self.serialnumber = kwargs.get("serial", channel)
         self.cprotocol = kwargs.get("protocol", self.PROTOCOL_CAN_FD if self.is_fd else self.PROTOCOL_CAN_20)
         self.receive_own_messages = kwargs.get("receive_own_messages", False)
@@ -131,8 +142,25 @@ class USBtingoBus(BusABC):
         self.deviceinfo_read()
         self.command_write(self.CMD_SET_MODE, 0)
         self.command_write(self.CMD_SET_PROTOCOL, self.cprotocol | (flags << 8))
-        self.command_write(self.CMD_SET_BAUDRATE, 0, 0, struct.pack("<I", self.bitrate))
-        self.command_write(self.CMD_SET_BAUDRATE, 1, 0, struct.pack("<I", self.data_bitrate))
+        if self.is_fd and isinstance(timing, BitTimingFd):
+            nbtp_register = (
+                ((timing.nom_tseg2 - 1) & 0x07f) << 0   # 6:0   NTSEG2
+              | ((timing.nom_tseg1 - 1) & 0x0ff) << 8   # 15:8  NTSEG1
+              | ((timing.nom_brp - 1)   & 0x1ff) << 16  # 24:16 NBRP
+              | ((timing.nom_sjw - 1)   & 0x07f) << 25  # 31:25 NSJW
+            )
+            dbtp_register = (
+                ((timing.data_sjw - 1)   & 0x0f) << 0   # 3:0   DSJW
+              | ((timing.data_tseg2 - 1) & 0x0f) << 4   # 7:4   DTSEG2
+              | ((timing.data_tseg1 - 1) & 0x1f) << 8   # 12:8  DTSEG1
+              | ((timing.data_brp - 1)   & 0x1f) << 16  # 20:16 DBRP
+              | (1 << 23)                               # 23    TDC
+            )
+            self.mcan_register_write(0x1C, nbtp_register)
+            self.mcan_register_write(0x0C, dbtp_register)
+        else:
+            self.command_write(self.CMD_SET_BAUDRATE, 0, 0, struct.pack("<I", self.bitrate))
+            self.command_write(self.CMD_SET_BAUDRATE, 1, 0, struct.pack("<I", self.data_bitrate))
         self.command_write(self.CMD_SET_MODE, mode)
         self.timestamp_offset = time.time()
         self.recordingActive = False
